@@ -1,20 +1,11 @@
 const express = require('express')
 const router = express.Router()
 const { NotFound } = require('http-errors')
-const Joi = require('joi')
-
-const contactsOperations = require('../../model')
-
-const contactSchema = Joi.object({
-  name: Joi.string().required(),
-  email: Joi.string().required(),
-  phone: Joi.string().required(),
-})
+const { joiSchema, Contact, favoriteJoiSchema } = require('../../models/contact')
 
 router.get('/', async (req, res, next) => {
   try {
-    const contacts = await contactsOperations.listContacts()
-    console.log(res.json)
+    const contacts = await Contact.find({})
     res.json({
       status: 'success',
       code: 200,
@@ -30,15 +21,15 @@ router.get('/', async (req, res, next) => {
 router.get('/:contactId', async (req, res, next) => {
   try {
     const { contactId } = req.params
-    const contactById = await contactsOperations.getContactById(contactId)
-    if (!contactById) {
+    const result = await Contact.findById(contactId)
+    if (!result) {
       throw new NotFound(`Product with id=${contactId} not found`)
     }
     res.json({
       status: 'success',
       code: 200,
       data: {
-        result: contactById
+        result
       }
     })
   } catch (error) {
@@ -48,12 +39,12 @@ router.get('/:contactId', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { error } = contactSchema.validate(req.body)
+    const { error } = joiSchema.validate(req.body)
     if (error) {
       error.status = 400
       throw error
     }
-    const result = await contactsOperations.addContact(req.body)
+    const result = await Contact.create(req.body)
     res.status(201).json({
       status: 'success',
       code: 201,
@@ -69,7 +60,7 @@ router.post('/', async (req, res, next) => {
 router.delete('/:contactId', async (req, res, next) => {
   try {
     const { contactId } = req.params
-    const result = await contactsOperations.removeContact(contactId)
+    const result = await Contact.findByIdAndRemove(contactId)
     if (!result) {
       throw new NotFound(`Product with id=${contactId} not found`)
     }
@@ -88,13 +79,40 @@ router.delete('/:contactId', async (req, res, next) => {
 
 router.put('/:contactId', async (req, res, next) => {
   try {
-    const { error } = contactSchema.validate(req.body)
+    const { error } = joiSchema.validate(req.body)
     if (error) {
       error.status = 400
       throw error
     }
     const { contactId } = req.params
-    const result = await contactsOperations.updateContact(contactId, req.body)
+    const result = await Contact.findByIdAndUpdate(contactId, req.body, { new: true })
+    if (!result) {
+      throw new NotFound(`Product with id=${contactId} not found`)
+    }
+    res.json({
+      status: 'success',
+      code: 200,
+      message: 'product updated',
+      data: {
+        result
+      }
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+router.patch('/:contactId/favorite', async (req, res, next) => {
+  try {
+    const { error } = favoriteJoiSchema.validate(req.body)
+    if (error) {
+      error.status = 400
+      error.message = 'missing field favorite'
+      throw error
+    }
+    const { contactId } = req.params
+    const { favorite } = req.body
+    const result = await Contact.findByIdAndUpdate(contactId, { favorite }, { new: true })
     if (!result) {
       throw new NotFound(`Product with id=${contactId} not found`)
     }
