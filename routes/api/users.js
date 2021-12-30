@@ -2,8 +2,12 @@ const express = require('express')
 const { Conflict, Unauthorized } = require('http-errors')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
+const gravatar = require('gravatar')
+const path = require('path')
+const fs = require('fs/promises')
 
 const { auth } = require('../../middlewares/auth')
+const { upload } = require('../../middlewares/upload')
 const { User, userJoiSchema, subJoiSchema } = require('../../models/user')
 const { SECRET_KEY } = process.env
 
@@ -23,7 +27,8 @@ router.post('/signup', async (req, res, next) => {
       throw new Conflict('Email in use')
     }
     const hashPassword = bcrypt.hashSync(password, bcrypt.genSaltSync(10))
-    await User.create({ email, password: hashPassword })
+    const avatarURL = gravatar.url(email)
+    await User.create({ email, password: hashPassword, avatarURL })
 
     res.status(201).json({
       status: 'success',
@@ -31,6 +36,7 @@ router.post('/signup', async (req, res, next) => {
       data: {
         user: {
           email,
+          avatarURL,
           subscription: 'starter'
         }
       }
@@ -103,8 +109,6 @@ router.get('/current', auth, async (req, res, next) => {
   }
 })
 
-/* Дополнительное задание 3 */
-
 router.patch('/', auth, async(req, res, next) => {
   try {
     const { error } = subJoiSchema.validate(req.body)
@@ -124,6 +128,23 @@ router.patch('/', auth, async(req, res, next) => {
       }
     })
   } catch (error) {
+    next(error)
+  }
+})
+
+router.patch('/avatars', auth, upload.single('avatar'), async(req, res, next) => {
+  const { path: tempUpload, originalname } = req.file
+  const avatarDir = path.join(__dirname, '../../', 'public', 'avatars')
+  const { _id } = req.user
+  const imageName = `${_id}_${originalname}`
+  try {
+    const resultUpload = path.join(avatarDir, imageName)
+    await fs.rename(tempUpload, resultUpload)
+    const avatarURL = path.join('public', 'avatars', imageName)
+    await User.findByIdAndUpdate(_id, { avatarURL })
+    res.json({ avatarURL })
+  } catch (error) {
+    await fs.unlink(tempUpload)
     next(error)
   }
 })
