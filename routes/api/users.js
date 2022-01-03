@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken')
 const gravatar = require('gravatar')
 const path = require('path')
 const fs = require('fs/promises')
+const Jimp = require('jimp')
 
 const { auth } = require('../../middlewares/auth')
 const { upload } = require('../../middlewares/upload')
@@ -139,9 +140,16 @@ router.patch('/avatars', auth, upload.single('avatar'), async(req, res, next) =>
   const imageName = `${_id}_${originalname}`
   try {
     const resultUpload = path.join(avatarDir, imageName)
+    Jimp.read(tempUpload)
+      .then(image => {
+        image.resize(250, 250).write(resultUpload)
+      })
+      .catch(err => {
+        next(err)
+      })
     await fs.rename(tempUpload, resultUpload)
     const avatarURL = path.join('public', 'avatars', imageName)
-    await User.findByIdAndUpdate(_id, { avatarURL })
+    // await User.findByIdAndUpdate(_id, { avatarURL })
     res.json({ avatarURL })
   } catch (error) {
     await fs.unlink(tempUpload)
