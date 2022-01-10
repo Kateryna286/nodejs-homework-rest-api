@@ -10,7 +10,7 @@ router.get('/', auth, async (req, res, next) => {
 
     /* Дополнительные задание 1, 2 */
 
-    const { page = 1, limit = 10, favorite } = req.query
+    const { page = 1, limit = 10, favorite = false } = req.query
     const skip = (page - 1) * limit
     const contacts = await Contact.find({ owner: _id, favorite: favorite }, '', { skip, limit: Number(limit) }).populate('owner', 'email subscription')
     res.json({
